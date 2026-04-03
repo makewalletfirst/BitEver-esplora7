@@ -20,7 +20,7 @@ services:
 
   nginx:
     # SilverRuler님의 커스텀 이미지
-    image: silverruler/bitever-esplora-frontend:v1.0
+    image: silverruler/bitever-esplora-frontend:v1.1
     container_name: bitever-esplora-nginx
     restart: unless-stopped
     network_mode: host
