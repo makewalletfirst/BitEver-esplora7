@@ -1,0 +1,28 @@
+services:
+  electrs:
+    image: mempool/electrs:v3.2.0
+    container_name: electrs
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -vvvv
+      - --network=mainnet            # v3.2.0에서 'bitcoin'이 아닌 'mainnet'
+      - --db-dir=/data/db
+      - --daemon-rpc-addr=127.0.0.1:8334
+      - --cookie=user:pass
+      - --jsonrpc-import
+      - --http-addr=0.0.0.0:3002
+      - --daemon-dir=/bitcoin        # ↓ bitcoind datadir를 컨테이너에 RO로 마운트
+    volumes:
+      - /home/makewalletfirst/electrs/data:/data
+      - /home/makewalletfirst/myfork:/bitcoin:ro
+
+  nginx:
+    image: nginx:alpine
+    container_name: bitever-esplora-nginx
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /home/makewalletfirst/bitever-esplora/nginx/esplora-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /home/makewalletfirst/bitever-esplora/frontend/dist:/usr/share/nginx/html:ro
+

@@ -1,0 +1,92 @@
+# Build libwally wasm files. Used for client-side blinding verification on Elements-based chains
+
+FROM blockstream/wallycore@sha256:62cc52bd3ad9176b55cb486482368f858a4debee248a15d2fada0a62eb074a05 AS libwally-wasm
+ARG NO_LIQUID
+ENV EXPORTED_FUNCTIONS="['_malloc', '_free', '_wally_init','_wally_asset_value_commitment','_wally_asset_generator_from_bytes']"
+ENV EXTRA_EXPORTED_RUNTIME_METHODS="['getValue', 'ccall']"
+ENV EMCC_OPTIONS="-s MODULARIZE=1 -s EXPORT_NAME=InitWally"
+RUN sh -c '[ -n "$NO_LIQUID" ] && mkdir -p /wally/dist || ( \
+    cd /opt/emsdk && . ./emsdk_env.sh \
+    && git clone --no-checkout https://github.com/elementsproject/libwally-core /wally \
+    && cd /wally && git checkout f394af85081cbebea50f470373a89f77ad52cb94 \
+    && git submodule sync --recursive && git submodule update --init --recursive \
+    && ./tools/build_wasm.sh --enable-elements)'
+
+FROM debian:bookworm-slim
+SHELL ["/bin/bash", "-c"]
+
+ENV CORE_BUILD_DEPS="autoconf autotools-dev automake libtool pkg-config bsdmainutils build-essential"
+ENV ESPLORA_BUILD_DEPS="clang cmake curl git"
+RUN mkdir -p /srv/explorer \
+ && apt-get -yqq update \
+ && apt-get -yqq upgrade \
+ && apt-get -yqq install ${ESPLORA_BUILD_DEPS} tor ${CORE_BUILD_DEPS}
+
+
+RUN git clone --quiet --depth 1 --single-branch --branch v0.40.1 https://github.com/nvm-sh/nvm.git /root/.nvm \
+ && rm -rf /root/.nvm/.git \
+ && source /root/.nvm/nvm.sh \
+ && nvm install v18.20.4
+
+ARG TARGETARCH
+ENV SHA256SUM_ELEMENTS_X86_64="86e3061a6cb82ea979954d7b187442b6a104648c26bda2ddf297e513b5d53c51"
+ENV SHA256SUM_ELEMENTS_ARM64="e44566fad37cb632fa7b4d288e6e20fb3af26745a20950da8c55997ad427e05c"
+ENV SHA256SUM_BITCOINCORE_X86_64="acc223af46c178064c132b235392476f66d486453ddbd6bca6f1f8411547da78"
+ENV SHA256SUM_BITCOINCORE_ARM64="154c9b9e6e17136edc8f20fda5d252fb339e727e4a85ef49e7d8facb9085f2d3"
+
+ENV VERSION_BITCOINCORE=27.2
+RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+   curl -sL -o bitcoin.tar.gz "https://bitcoincore.org/bin/bitcoin-core-${VERSION_BITCOINCORE}/bitcoin-${VERSION_BITCOINCORE}-aarch64-linux-gnu.tar.gz"; \
+   echo "${SHA256SUM_BITCOINCORE_ARM64}  bitcoin.tar.gz" | sha256sum --check; \
+   else \
+   curl -sL -o bitcoin.tar.gz "https://bitcoincore.org/bin/bitcoin-core-${VERSION_BITCOINCORE}/bitcoin-${VERSION_BITCOINCORE}-x86_64-linux-gnu.tar.gz"; \
+   echo "${SHA256SUM_BITCOINCORE_X86_64}  bitcoin.tar.gz" | sha256sum --check; \
+   fi \
+ && tar xzf bitcoin.tar.gz -C /srv/explorer \
+ && ln -s "/srv/explorer/bitcoin-${VERSION_BITCOINCORE}" /srv/explorer/bitcoin \
+ && rm bitcoin.tar.gz
+
+ENV VERSION_ELEMENTS=23.2.7
+RUN if [ "${TARGETARCH}" = "arm64" ]; then \
+   curl -sL -o elements.tar.gz "https://github.com/ElementsProject/elements/releases/download/elements-${VERSION_ELEMENTS}/elements-${VERSION_ELEMENTS}-aarch64-linux-gnu.tar.gz"; \
+   echo "${SHA256SUM_ELEMENTS_ARM64}  elements.tar.gz" | sha256sum --check; \
+   else \
+   curl -sL -o elements.tar.gz "https://github.com/ElementsProject/elements/releases/download/elements-${VERSION_ELEMENTS}/elements-${VERSION_ELEMENTS}-x86_64-linux-gnu.tar.gz"; \
+   echo "${SHA256SUM_ELEMENTS_X86_64}  elements.tar.gz" | sha256sum --check; \
+   fi \
+ && tar xzf elements.tar.gz -C /srv/explorer \
+ && ln -s "/srv/explorer/elements-${VERSION_ELEMENTS}" /srv/explorer/liquid \
+ && mv /srv/explorer/liquid/bin/{elementsd,liquidd} \
+ && mv /srv/explorer/liquid/bin/{elements-cli,liquid-cli} \
+ && rm elements.tar.gz
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain 1.75.0
+RUN source /root/.cargo/env \
+ && mkdir -p /srv/explorer/electrs{,_liquid} \
+ && git clone --no-checkout https://github.com/blockstream/electrs.git \
+ && (cd electrs \
+ && git checkout 306f66acf2ab10bcd99b8012e95a0de30b2cc012 \
+ && cp contrib/popular-scripts.txt /srv/explorer \
+ && cargo install --root /srv/explorer/electrs_bitcoin --locked --path . --features electrum-discovery \
+ && cargo install --root /srv/explorer/electrs_liquid --locked --path . --features electrum-discovery,liquid \
+    ) \
+ && rm -fr electrs \
+ && strip /srv/explorer/electrs_*/bin/electrs
+
+# Install websocat v1.9.0 with none of the default features, which aren't needed (ssl, subprocess support and stdio support)
+RUN source /root/.cargo/env \
+ && git clone --no-checkout https://github.com/vi/websocat \
+ && (cd websocat \
+ && git checkout 9f301bd82bbb28e385a5020870738f98ab9010b1 \
+ && cargo install --root /srv/explorer/websocat --locked --path . --no-default-features \
+    ) \
+ && strip /srv/explorer/websocat/bin/websocat \
+ && rm -fr /root/.cargo websocat
+
+# cleanup
+RUN apt-get --auto-remove remove -yqq --purge ${ESPLORA_BUILD_DEPS} manpages ${CORE_BUILD_DEPS} \
+ && apt-get clean \
+ && apt-get autoclean \
+ && rm -rf /usr/share/doc* /usr/share/man /usr/share/postgresql/*/man /var/lib/apt/lists/* /var/cache/* /tmp/* /root/.cache /*.deb /root/.cargo
+
+COPY --from=libwally-wasm /wally/dist /srv/wally_wasm

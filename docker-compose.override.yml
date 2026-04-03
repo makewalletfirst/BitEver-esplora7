@@ -1,0 +1,6 @@
+# docker-compose.override.yml
+services:
+  nginx:
+    volumes:
+      - ./nginx/electrum-stream.conf:/etc/nginx/stream.d/electrum-stream.conf:ro
+    # 필요 시 depends_on: [electrs]

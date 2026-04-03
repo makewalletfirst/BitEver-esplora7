@@ -1,0 +1,7 @@
+FROM nginx:alpine
+
+# 로컬의 수정한 dist 폴더를 이미지 내부로 복사
+COPY ./frontend/dist /usr/share/nginx/html
+
+# 실행 권한 및 설정 확인
+RUN chmod -R 755 /usr/share/nginx/html

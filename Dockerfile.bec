@@ -1,0 +1,5 @@
+FROM blockstream/esplora:latest
+
+# 로컬에서 완벽하게 치환해둔 dist 폴더를 컨테이너 내부의 웹 서빙 폴더로 통째로 복사하여 덮어씌웁니다.
+# (에스플로라 프론트엔드의 일반적인 서빙 경로입니다. 만약 다르다면 경로를 수정해 주세요)
+COPY ./frontend/dist/ /srv/explorer/static/

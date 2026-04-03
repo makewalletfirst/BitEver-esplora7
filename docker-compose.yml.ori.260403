@@ -1,0 +1,39 @@
+services:
+  electrs:
+    image: mempool/electrs:v3.2.0
+    container_name: electrs
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -vvvv
+      - --network=mainnet
+      - --db-dir=/data/db
+      - --daemon-rpc-addr=127.0.0.1:8334
+      - --cookie=user:pass
+      - --jsonrpc-import
+      - --http-addr=0.0.0.0:3002
+      - --daemon-dir=/bitcoin
+      - --electrum-rpc-addr=0.0.0.0:50001
+    volumes:
+      - /root/electrs/data:/data
+      - /root/myfork:/bitcoin:ro
+
+  nginx:
+    # [수정됨] 이제 공식 nginx 대신 SilverRuler님의 커스텀 이미지를 사용합니다.
+    image: silverruler/bitever-esplora-frontend:v1.0
+    container_name: bitever-esplora-nginx
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /root/bitever-esplora/nginx/esplora-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # [삭제됨] 아래 라인은 이미 이미지 내부에 구워졌으므로 더 이상 필요 없습니다.
+      # - /root/bitever-esplora/frontend/dist:/usr/share/nginx/html:ro
+
+  haproxy:
+    image: haproxy:lts-alpine
+    container_name: bitever-esplora-haproxy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /root/bitever-esplora/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - /root/bitever-esplora/haproxy/certs:/etc/haproxy/certs:ro
