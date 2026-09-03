@@ -1,0 +1,86 @@
+.navbar-brand::before {
+  background: url(img/icons/explorer_logo.svg);
+  background-size: contain;
+  width: 245px;
+  margin: 0;
+  background-repeat: no-repeat;
+}
+
+.theme-light .navbar-brand::before {
+  background: url(img/icons/explorer_dark_logo.svg);
+  background-repeat: no-repeat;
+  background-size: contain;
+  width: 245px;
+  margin: 0;
+}
+
+.footer-logo::before {
+  width: 220px;
+  height: 93px;
+  background-image: url(img/blockstream-full-logo.png);
+  background-size: 100%;
+  content: ' ';
+  display: block;
+}
+.footer-logo {
+  margin-right: 0px;
+}
+.footer-links {
+  margin-top: 5px;
+}
+.theme-light .footer-logo::before {
+  background-image: url(img/blockstream-full-logo-light.png);
+}
+
+@media only screen and (max-width: 1000px) {
+  .footer-logo::before {
+    width: 200px;
+    height: 83px;
+  }
+}
+
+@media only screen and (max-width: 900px) {
+  .footer-logo::before {
+    margin-top: 30px;
+  }
+
+  .theme-light .navbar-brand::before, .navbar-brand::before {
+    
+    background-size: 54px 54px;
+    width: 54px;
+  }
+
+  .theme-light .navbar-brand::before {
+    background: url(img/icons/dark-logo-icon.svg);
+    background-repeat: no-repeat;
+  }
+
+  .navbar-brand::before {
+    background: url(img/icons/light-logo-icon.svg);
+    background-repeat: no-repeat;
+  }
+}
+
+.theme-light .primary-btn, 
+.theme-light .primary-btn:link, 
+.theme-light .primary-btn:visited, 
+.theme-light .primary-btn:hover, 
+.theme-light .primary-btn:focus {
+  color: #0C0C0F;
+}
+
+.theme-light .hero-section p, .theme-light .info-section p, .theme-light .feature p, .theme-light .cta-section p, .theme-light .pricing-card p {
+  color: #080B0E;
+}
+
+.theme-light .cta-section {
+  background-color: #F6F7F9;
+}
+
+.theme-light .pricing-card {
+  background: #fff;
+}
+
+.theme-light .pricing-card p > a {
+  color: #FF9417;
+}

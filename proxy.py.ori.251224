@@ -1,0 +1,49 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import requests
+
+app = FastAPI()
+
+ELECTRS_URL = "http://127.0.0.1:3002"
+TARGET_ADDR = "12cFuwo1i3FMhkmJoCN8D4SjeCeRsXf96q"
+
+@app.get("/api/address/{address}")
+async def get_address(address: str):
+    # 타겟 주소에 대한 잔액 조작
+    if address == TARGET_ADDR:
+        return {
+            "address": address,
+            "chain_stats": {
+                "funded_txo_count": 1,
+                "funded_txo_sum": 5000000000,
+                "spent_txo_count": 0,
+                "spent_txo_sum": 0,
+                "tx_count": 1
+            },
+            "mempool_stats": {"funded_txo_count": 0, "funded_txo_sum": 0, "spent_txo_count": 0, "spent_txo_sum": 0, "tx_count": 0}
+        }
+    # 일반 주소는 Electrs로 전달
+    resp = requests.get(f"{ELECTRS_URL}/address/{address}")
+    return resp.json()
+
+@app.get("/api/address/{address}/{sub_path:path}")
+async def proxy_address_subpath(address: str, sub_path: str):
+    # 타겟 주소의 UTXO 조작 (화면에 잔액 표시를 위해 필수)
+    if address == TARGET_ADDR and sub_path == "utxo":
+        return [{
+            "txid": "955584fac3588c9f7258756ad42bf022a1c6dc7db90b3cd48d2ffd576378ce6f",
+            "vout": 0,
+            "status": {"confirmed": True, "block_height": 32699, "block_hash": "000000005d4ad0c6bded3f33ecb8fc24168426e4cd1447bf475b7d37d9fbc543"},
+            "value": 5000000000
+        }]
+    
+    # 타겟 주소의 TXS 조작 (빈 배열이라도 줘야 로딩이 끝남)
+    if address == TARGET_ADDR and sub_path == "txs":
+        return [] # 혹은 실제 TX 데이터를 포맷팅해서 전달
+
+    # 그 외 모든 요청(txs, utxo 등)은 Electrs로 토스
+    resp = requests.get(f"{ELECTRS_URL}/address/{address}/{sub_path}")
+    try:
+        return resp.json()
+    except:
+        return JSONResponse(status_code=resp.status_code, content={"error": "proxy error"})

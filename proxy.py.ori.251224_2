@@ -1,0 +1,47 @@
+import requests
+import json
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
+
+ELECTRS_URL = "http://127.0.0.1:3002"
+
+# 생성된 10만여 개의 매핑 데이터 로드
+print("P2PK 매핑 데이터를 로드 중입니다...")
+try:
+    with open("p2pk_map.json", "r") as f:
+        P2PK_DB = json.load(f)
+    print(f"성공: {len(P2PK_DB)}개의 주소 매핑이 로드되었습니다.")
+except FileNotFoundError:
+    print("오류: p2pk_map.json 파일을 찾을 수 없습니다.")
+    P2PK_DB = {}
+
+@app.get("/api/address/{address}")
+async def get_address(address: str):
+    # 1. 사토시 시대 P2PK 주소인지 확인
+    if address in P2PK_DB:
+        sh = P2PK_DB[address]
+        # Electrs의 scripthash 엔드포인트에서 데이터 가져오기
+        resp = requests.get(f"{ELECTRS_URL}/scripthash/{sh}")
+        data = resp.json()
+        # 프론트엔드 표시를 위해 address 필드 주입
+        data["address"] = address
+        return data
+    
+    # 2. 일반 주소는 원래대로 Electrs 호출
+    resp = requests.get(f"{ELECTRS_URL}/address/{address}")
+    return resp.json()
+
+@app.get("/api/address/{address}/{sub_path:path}")
+async def proxy_address_subpath(address: str, sub_path: str):
+    # P2PK 주소의 하위 경로(txs, utxo) 처리
+    if address in P2PK_DB:
+        sh = P2PK_DB[address]
+        resp = requests.get(f"{ELECTRS_URL}/scripthash/{sh}/{sub_path}")
+        return resp.json()
+    
+    # 일반 주소 처리
+    resp = requests.get(f"{ELECTRS_URL}/address/{address}/{sub_path}")
+    return resp.json()
+
